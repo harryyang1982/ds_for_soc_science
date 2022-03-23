@@ -21,6 +21,8 @@ addTrans <- NetworkChange:::addTrans
 
 ## default R base plot format
 par(mar=c(3,3,2,1), mgp=c(2,.7,0), tck=.02)
+par(family = "AppleGothic")
+
 
 ## theme_set(theme_classic())
 knitr::opts_chunk$set(echo=TRUE, out.width="100%", fig.align = "center", message=F, warning=F, fig.height = 6, cache=T, dpi = 300, dev = "png")
