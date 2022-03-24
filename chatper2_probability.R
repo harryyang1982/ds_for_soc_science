@@ -39,3 +39,5 @@ birthday.simulator2 <- function(n, total.sim = 1000000) {
 }
 
 birthday.simulator2(20)
+
+#hash
