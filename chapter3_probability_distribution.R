@@ -174,3 +174,159 @@ curve(dnorm(x, 0, 3), lwd = 2, add=T, col=4)
 legend("topleft", legend=c('N(0, 0.25)', 'N(0, 1)', 'N(0, 4)', 'N(0, 9)'),
        lwd=2, bty="n", col=1:4)
 
+# 3.5 디리클레분포(Dirichlet Distribution)
+if(!require(plot3D)) install.packages("plot3D")
+if(!require(MCMCpack)) install.packages("MCMCpack")
+if(!require(akima)) install.packages("akima")
+if(!require(rgl)) install.packages("rgl")
+
+library(plot3D)
+library(MCMCpack)
+library(akima)
+library(rgl)
+
+#디리클레 모수
+alpha_params <- c(2, 2, 2)
+
+# 심플렉스에 그릴 정규화된 그리드 변수 작성
+granularity <- 20
+draws <- matrix(ncol=3, nrow=(granularity*granularity*granularity)-1)
+i <- 0
+for (x in 1:granularity) {
+  for (y in 1:granularity) {
+    for (z in 1:granularity) {
+      draws[i, ] <- c(x, y, z)
+      draws[i, ] <- draws[i, ] / sum(draws[i, ])
+      i <- i + 1
+    }
+  }
+}
+x <- draws[, 1]
+y <- draws[, 2]
+z <- draws[, 3]
+density <- ddirichlet(draws, alpha_params)
+# 유클리드 공간으로 심플렉스를 변환
+x <- .5 * (2*x+y)
+y <- .5 * y * sqrt(3)
+# (100x100) grid
+grid <- interp(x, y, density, duplicate="strip", linear=FALSE,
+                   xo=seq(min(x), max(x), length=100),
+                   yo=seq(min(y), max(y), length=100))
+
+# heatmap
+image2D(x=grid$x, y=grid$y, z=grid$z)
+
+# 3.6 스튜던트 t분포(Student t Distribution)
+curve(dt(x, df = 1), lwd=1, xlim=c(-6, 6), ylim=c(0, .45),
+                                 ylab="밀도", xlab="y", col=1)
+
+grid()
+curve(dt(x, df = 5), lwd = 1, add=TRUE, col=2)
+curve(dt(x, df = 10), lwd = 1, add=TRUE, col=3)
+curve(dt(x, df=30), lwd=1, add=TRUE, col=4)
+curve(dnorm(x, 0, 1), lwd=5, add=TRUE, col=addTrans(6, 50))
+legend("topleft", 
+       legend=c('t(0, 1, 1)', 't(0, 1, 5)', 't(0, 1, 10)', 't(0, 1, 30)', 'N(0, 1)'),
+       lwd=c(1, 1, 1, 1, 5), bty="n", col=c(1:4, addTrans(6, 50)))
+
+# 3.7 코시분포(Cauchy Distribution)
+curve(dcauchy(x, scale = 1), lwd = 1, xlim=c(-8, 8), ylim=c(0, .35),
+      ylab="밀도", xlab="Y", col=1)
+grid()
+curve(dcauchy(x, scale=2), lwd=1, add=T, col=2)
+curve(dcauchy(x, scale=3), lwd=1, add=T, col=3)
+curve(dcauchy(x, scale=4), lwd=1, add=T, col=4)
+curve(dt(x, df=1), lwd=5, add=T, col=addTrans(6, 50))
+legend("topleft",
+       legend=c("Cauchy(0,1)", "Cauchy(0,2)", "Cauchy(0,3)", "Cauchy(0,4)", "t(0,1,1)"),
+       lwd=c(1,1,1,1,5), bty="n", col=c(1:4, addTrans(6, 50)))
+
+# 3.8 라플라스분포(Laplace Distribution)
+
+require(rmutil)
+curve(dlaplace(x, s=1), lwd=1, xlim=c(-8, 8), ylim=c(0, .55),
+      ylab="밀도", xlab="Y", col=1)
+grid()
+curve(dlaplace(x, s=2), lwd=1, add=T, col=2)
+curve(dlaplace(x, s=3), lwd=1, add=T, col=3)
+curve(dlaplace(x, s=4), lwd=1, add=T, col=4)
+legend("topleft", legend=c('Laplace(0, 1)', 'Laplace(0, 2)', 'Laplace(0, 3)', 'Laplace(0, 4)'),
+                           lwd=1, bty='n', col=1:4)
+
+# 4절 중심극한정리
+# 1단계 확률 분포 만들기
+my.samples <- function(dist, r, n, param1, param2=NULL){
+  set.seed(123)
+  switch(dist,
+         "Exponential" = matrix(rexp(r*n, param1), r),
+         "Normal" = matrix(rnorm(r*n, param1, param2), r),
+         "Uniform" = matrix(runif(r*n, param1, param2), r),
+         "Poisson" = matrix(rpois(r*n, param1), r),
+         "Binomial" = matrix(rbinom(r*n, param1, param2), r),
+         "Beta" = matrix(rbeta(r*n, param1, param2), r),
+         "Gamma" = matrix(rgamma(r*n, param1, param2), r),
+         "Chi-squared" = matrix(rchisq(r*n, param1), r),
+         "Cauchy" = matrix(rcauchy(r*n, param1, param2), r)
+         )
+}
+
+# 2단계 평균과 표준편차 계산
+mu <- function(dist, param1, param2=NULL) {
+  switch(dist,
+         "Exponential" = param1^-1,
+         "Normal"=param1,
+         "Uniform" = (param1+param2)/2,
+         "Poisson" = param1,
+         "Binomial"=param1*param2,
+         "Beta" = param1/(param1+param2),
+         "Gamma" = param1 / param2,
+         "Chi-squared" = param1,
+         "Cauchy" = param1)
+}
+
+sigma <- function(dist, param1, param2=NULL) {
+  switch(dist,
+         "Exponential" = param1^-1,
+         "Normal" = param2,
+         "Uniform"= sqrt((param2-param1)^2/12),
+         "Poisson" = sqrt(param1),
+         "Binomial" = sqrt(param1*param2*(1-param2)),
+         "Beta"=sqrt(param1*param2/((param1+param2)^2*(param1+param2+1))),
+         "Gamma"=sqrt(param1/(param2)^2),
+         "Chi-squared"=sqrt(2*param1),
+         "Cauchy"=sqrt(param2))
+}
+
+# 3단계 CLT함수로 10,000번 표본 추출하는 시뮬레이션 진행 => 히스토그램 및 커브 시각화
+
+CLT <- function(dist, param1, param2=NULL, r=10000) {
+  ## dist = 확률밀도함수
+  ## r = 반복추출횟수
+  par(mfrow=c(3, 3), mgp=c(1.75, .75, 0),
+      oma=c(2, 2, 2, 2), mar=c(3, 3, 2, 0), xpd=NA)
+  for (n in c(1:6, 10, 50, 100)) {
+    samples <- my.samples(dist, r, n, param1, param2)
+    ##표본평균 계산
+    sample.means <- apply(samples, 1, mean)
+    ## 표본평균 히스토그램
+    hist(sample.means, col=ifelse(n<=10, grey(.1*(11-n)), rgb(0, 0, n, max=110)),
+         freq=FALSE, xlab="Sample Mean", main=paste("n=", n))
+    
+    ## CLT 정규분포 그리기 N(mean=mu, sd=sigma/sqrt(n))
+    x <- seq(min(sample.means), max(sample.means), length=100)
+    curve(dnorm(x, mean=mu(dist, param1, param2),
+                sd=(sigma(dist, param1, param2))/sqrt(n)),
+          col="red", lwd=2, add=TRUE)
+  }
+  ## 확률분포 이름 레이블
+  mtext(paste(dist, " Distribution (",
+              param1, ifelse(is.null(param2), "", ","),
+              param2, ")", sep=""), outer=TRUE, cex=1)
+}
+
+# 4단계: 함수 실행
+CLT("Exponential", 1)
+
+CLT("Uniform", 1, 5)
+
+CLT("Cauchy", 1, 1)
