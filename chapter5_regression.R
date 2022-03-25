@@ -35,6 +35,7 @@ rho.test
 
 rho <- rho.test$estimate
 galton.lm <- lm(child ~ parent, data = galton.cen)
+
 stargazer(galton.lm, header=FALSE, type='latex',
           title = "골튼의 신장유전 자료에 대한 회귀분석: 자녀의 신장 ~ 부모의 중간 신장",
           label='galton.reg')
