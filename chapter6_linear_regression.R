@@ -40,7 +40,6 @@ rect(xleft = x - abs(fit$res) / 2 * asp, ybottom = fit$fitted.values,
      col = rgb(1, 0, 0, 0.3), border = NA)
 
 # lm을 통한 최소 제곱 추정
-
 set.seed(1999)
 x <- seq(0, 1, length=10)
 y <- x + rnorm(10, 0, 0.3)
@@ -203,3 +202,102 @@ reg1 <- lm(prestige ~ education, data=Prestige)
 jhp_report(reg1, title="직업별 명성과 교육수준의 관계",
            label="tab:prestige1",
            dep.var.labels = "prestige")
+
+library(ggfortify)
+autoplot(reg1)
+
+# 선형 회귀모형에 통제변수 넣기
+avPlots(lm(prestige ~ education + income, data=Prestige))
+avPlots(lm(prestige ~ education + log(income), data=Prestige))
+
+Prestige$blue <- as.factor(ifelse(Prestige$type == "bc", 1, 0))
+model1 <- lm(prestige ~ education * blue + log(income) + women, data=Prestige)
+model2 <- lm(prestige ~ education + blue, data=Prestige)
+model3 <- lm(prestige ~ education * blue, data=Prestige)
+model4 <- lm(prestige ~ education + blue + log(income) + women, data=Prestige)
+
+jhp_report(model1, model2, model3, model4, title="직업군 명성의 결정요인",
+           label="tab:pres4", dep.var.labels="prestige")
+
+
+jhp_report
+
+basic_plot <- ggplot(Prestige, aes(x = education, y = prestige, color = blue)) +
+  labs(x = "education", y = "prestige", color="blue collar") +
+  theme_jhp()
+
+basic_plot + geom_point(alpha = .3, size = 2) +
+  geom_smooth(method = "lm", aes(y = predict(model1, Prestige)))
+
+# 5절 caret 패키지를 이용한 선형 회귀분석 모형의 교차타당성 검증
+library(caret)
+Prestige$logincome <- log(Prestige$income)
+
+PrestigeCV <- Prestige %>% 
+  dplyr::select(prestige, income, logincome, education, women, blue) %>%  na.omit()
+
+set.seed(123)
+train.control <- trainControl(method = "repeatedcv", number = 5, repeats = 5)
+
+model1 <- train(prestige ~ income + education + women,
+                data = PrestigeCV, method = "lm", trControl = train.control)
+
+model2 <- train(prestige ~ logincome + education + women,
+                data = PrestigeCV, method = "lm", trControl = train.control)
+
+model3 <- train(prestige ~ (logincome + education + women) * blue,
+                data = PrestigeCV, method = "lm", trControl = train.control)
+
+results <- resamples(list(model1, model2, model3))
+summary(results)
+
+bwplot(results)
+dotplot(results)
+
+difValues <- diff(results)
+summary(difValues)
+
+#교차검증
+train.control <- trainControl(method = "LOOCV")
+model2 <- train(prestige ~ logincome + education + women,
+                data = PrestigeCV, method = "lm", trControl = train.control)
+model3 <- train(prestige ~ (logincome + education + women) * blue,
+                data = PrestigeCV, method = "lm", trControl = train.control)
+print(list(model2, model3))
+
+# 6절 선형 회귀분석은 다른 최적화 방법에 비해 열등한 분석 방법인가?
+set.seed(1999)
+x <- seq(0, 1, length=10)
+y <- x + rnorm(10, 0, 0.3)
+df.reg <- data.frame(x = x, y = y)
+
+plot(x, y, pch=19, cex=1.5, col=addTrans("brown", 100), asp = 0.7)
+abline(fit, lwd=1, col=1)
+loess_fit <- loess(y ~ x, data=df.reg)
+lines(df.reg$x, predict(loess_fit), lwd=1, col=2)
+pol_fit <- lm(y ~ poly(x, 3), data=df.reg)
+lines(df.reg$x, predict(pol_fit), lwd=1, col=3)
+spline_fit <- smooth.spline(x=df.reg$x, y = df.reg$y)
+lines(spline_fit, lwd=1, col=4)
+legend("topleft", c("OLS", "lowess", "polynomial", "spline"), lwd=1,
+       col=1:4, lty=1, bty="n")
+
+# 7절 종속변수와 설명변수가 뒤바뀌면 결과가 달라지는가
+
+set.seed(1973)
+N <- 100
+X <- rnorm(N)
+Y <- 1 + 3*X + rnorm(N)
+reg1 <- lm(Y~X)
+reg2 <- lm(X~Y)
+jhp_report(reg1, reg2, title="설명변수와 종속변수의 교체", 
+           label="tab:xy", dep.var.labels = c("Y", "X"))
+
+par(mar=c(3, 3, 2, 1), mgp=c(2, .7, 0), tck=.02)
+par(mfrow=c(1, 2))
+plot(X, Y, ylim=c(-6, 8), xlim=c(-6, 8), pch=19,
+     col=addTrans("navy", 30), cex=1, main="종속변수: Y, 설명변수:X")
+abline(reg1, col=addTrans("navy", 200))
+plot(Y, X, ylim=c(-6, 8), xlim=c(-6, 8), pch=19,
+                col=addTrans("navy", 30), cex=1, main="종속변수:X, 설명변수:Y")
+abline(reg2, col=addTrans("navy", 200))
