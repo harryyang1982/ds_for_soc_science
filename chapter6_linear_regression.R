@@ -133,3 +133,73 @@ abline(a = reg.inter2$coefficients[1] + reg.inter2$coefficients[3],
 legend("topleft", legend=c("남성", "여성"), bty="n", lwd=c(4, 4),
        lty=c(1, 1),
        col=c(addTrans("brown", 200), addTrans("brown", 100)))
+
+
+# 3.5 predict()를 이용한 신뢰구간 추정
+methods("predict")
+
+## 회귀분석 예측치
+df.lm2$pred.parallel2 <- predict(reg.parallel2)
+df.lm2$pred.inter2 <- predict(reg.inter2)
+
+## 신뢰구간
+conf.parallel2 <- predict(reg.parallel2, interval = "prediction")
+conf.inter2 <- predict(reg.inter2, interval = "prediction")
+head(conf.parallel2)
+head(conf.inter2)
+
+## 병렬분석
+df.parallel <- cbind(df.lm2, conf.parallel2)
+g.parallel <- ggplot(df.parallel, aes(x = x, y = y, color = D)) +
+  geom_point() +
+  geom_ribbon(aes(ymin=lwr, ymax=upr, fill=D, color=NULL), alpha=.2) +
+  geom_line(aes(y = fit), size = 1) +
+  labs(subtitle = "병렬분석", fill = NULL, color = NULL) +
+  theme_jhp() + xlab("교육") + ylab("소득")
+
+## 상호작용분석
+df.inter <- cbind(df.lm2, conf.inter2)
+g.inter <- ggplot(df.inter, aes(x = x, y = y, color = D)) +
+  geom_point() +
+  geom_ribbon(aes(ymin=lwr, ymax=upr, fill=D, color=NULL), alpha = .2) +
+  geom_line(aes(y = fit), size = 1) +
+  labs(subtitle = "상호작용분석", fill = NULL, color = NULL) +
+  theme_jhp() + xlab("교육") + ylab("소득")
+
+NetworkChange::multiplot(g.parallel, g.inter, cols=2)
+
+#제 4절 회귀분석 모형의 진단
+## 4.1 명성 자료를 이용한 회귀분석 진단
+
+require(car)
+data(Prestige)
+Prestige <- Prestige %>% drop_na()
+Prestige
+
+par(mar=c(3, 3, 2, 1), mgp=c(2, .7, 0), tck=.02)
+library(tidyverse)
+
+Prestige %>% 
+  dplyr::select(education, income, women, prestige) %>% 
+  gather() %>% 
+  ggplot(aes(value)) +
+  geom_histogram() +
+  facet_wrap(~key, scales = "free_x")
+
+par(mar=c(3, 3, 2, 1), mgp=c(2, .7, 0), tck=.02)
+library(GGally)
+Prestige %>% 
+  dplyr::select(education, income, women, prestige, type) %>% 
+  ggpairs(aes(alpha = 0.4))
+
+
+par(mar=c(3, 3, 2, 1), mgp=c(2, .7, 0), tck=.02)
+ggplot(Prestige, aes(x = education, y = prestige, color=type)) +
+  geom_point(size = 5, alpha = 0.5) +
+  labs(color = NULL) +
+  theme_jhp()
+
+reg1 <- lm(prestige ~ education, data=Prestige)
+jhp_report(reg1, title="직업별 명성과 교육수준의 관계",
+           label="tab:prestige1",
+           dep.var.labels = "prestige")
