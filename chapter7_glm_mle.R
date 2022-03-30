@@ -141,16 +141,20 @@ plot(fit$par, coef(fit.glm), xlab="optim 추정치", ylab="glm 추정치")
 abline(a=0, b=1, col="red", lty=3)
 
 ## 3.3 왈드검정과 우도비검정(likelihood ratio test)
+
+# 자료 생성
 set.seed(1999)
 X <- cbind(1, runif(100))
 theta.true <- c(1, -1, 1)
 y <- X%*%theta.true[1:2] + rnorm(100)
 K <- ncol(X)
 
+# 최대 우도 측정
 mle <- optim(c(1, 1, 1), lm.like, method="BFGS",
              control=list(fnscale = -1),
              hessian=TRUE, y=y, X=X)
 
+# 추정치 추출
 beta.mle <- mle$par[1:K]
 beta.mle.var <- solve(-mle$hessian)[1:K, 1:K]
 psi.mu <- mle$par[K+1]
@@ -160,6 +164,7 @@ sigma.mle.var <- sigma.mle^2*exp(sqrt(psi.var) - 1)
 coef.se <- c(sqrt(diag(beta.mle.var)), sqrt(sigma.mle.var))
 coef.mle <- c(beta.mle, sigma.mle)
 
+# 왈드 검정값 계산
 t.stat <- coef.mle/coef.se
 pval <- 2*(1-pt(abs(t.stat), nrow(X)-ncol(X)))
 results <- cbind(coef.mle, coef.se, t.stat, pval)
