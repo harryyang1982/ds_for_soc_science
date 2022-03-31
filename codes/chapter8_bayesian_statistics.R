@@ -31,3 +31,9 @@ legend("topright", lwd=c(2, 1, 1), bty="n",
        col=c(addTrans('forestgreen', 200),
              addTrans('firebrick4', 100),
              addTrans('firebrick4', 200)))
+
+# 2절
+
+# 3절 베이즈 정리
+
+# 4장 사전 확률분포에 대한 논쟁과 드 피네티의 정리
