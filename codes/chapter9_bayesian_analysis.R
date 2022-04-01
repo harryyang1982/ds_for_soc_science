@@ -221,3 +221,213 @@ out <- as.mcmc(poisson.rw.post)
 plot(out)
 
 summary(out)
+
+# 4. 깁스 추출
+binorm.gibbs <- function(mcmc=1000, rho){
+  out <- matrix(NA, mcmc, 2)
+  x2 <- 1
+  for(i in 1:mcmc){
+    x1 <- rnorm(1, rho*x2, 1-rho^2)
+    x2 <- rnorm(1, rho*x1, 1-rho^2)
+    out[i, ] <- c(x1, x2)
+  }
+  return(out)
+}
+## 자료 생성
+set.seed(1973)
+mcmc <- 1000
+rho0.2 <- binorm.gibbs(mcmc, 0.2)
+rho0.5 <- binorm.gibbs(mcmc, 0.5)
+rho0.8 <- binorm.gibbs(mcmc, 0.8)
+rho0.95 <- binorm.gibbs(mcmc, 0.95)
+library(RColorBrewer)
+library(MASS)
+col.brown <- NetworkChange:::addTrans("brown", 80)
+gibbs.density.plot <- function(input, xlab="x1", ylab="x2"){
+  k <- 11
+  my.cols <- rev(brewer.pal(k, "RdYlBu"))
+  z <- kde2d(input[,1], input[,2], n=50)
+  plot(input, xlab=xlab, ylab=ylab, type="o",
+       pch=19, col=col.brown, lwd=1)
+  contour(z, drawlabels=FALSE, nlevels=k, col=my.cols, add=TRUE)
+  legend("topleft", paste("correlation=", round(cor(input)[1,2],2)), bty="n")
+}
+par(mfrow=c(2,2))
+gibbs.density.plot(rho0.2)
+gibbs.density.plot(rho0.5)
+gibbs.density.plot(rho0.8)
+gibbs.density.plot(rho0.95)
+
+par(mar=c(3, 3, 2, 1), mgp=c(2, .7, 0), tck=.02)
+par(mfrow=c(2,2))    
+col.brown <- NetworkChange:::addTrans("brown", 150)
+plot(rho0.2[,1], type="l", col=col.brown)
+plot(rho0.5[,1], type="l", col=col.brown)
+plot(rho0.8[,1], type="l", col=col.brown)
+plot(rho0.95[,1], type="l", col=col.brown)
+
+par(mar=c(3,3,2,1), mgp=c(2,.7,0), tck=.02)
+par(mfrow=c(2, 2))
+acf(rho0.2[,1], lwd=5, col=col.brown)
+acf(rho0.5[,1], lwd=5, col=col.brown)
+acf(rho0.8[,1], lwd=5, col=col.brown)
+acf(rho0.95[,1], lwd=5, col=col.brown)
+
+## 4.1 선형 회귀분석 모형에 대한 깁스 추출
+lm.gibbs <- function(y, X, mcmc=1000, burnin=1000,
+                     b0, B0, c0, d0){
+  n <- length(y)
+  k <- ncol(X)
+  mcmc.store <- matrix(NA, mcmc, k+1)
+  tot.iter <- mcmc + burnin
+  B0inv <- solve(B0)
+  ## starting value
+  sigma2 <- 1/runif(1)
+  ## Sampler starts!
+  for (g in 1:tot.iter){
+    ## Step 1: Sample beta
+    ## posterior beta variance
+    post.beta.var <- 
+      chol2inv(chol(B0inv + (t(X)%*%X)/sigma2))
+    ## posterior beta mean
+    post.beta.mean <- 
+      post.beta.var%*%(B0inv%*%b0 + (t(X)%*%y)/sigma2)
+    ## draw new beta
+    beta <- post.beta.mean + chol(post.beta.var)%*%rnorm(k)
+    ## Step 2: Sample sigma2
+    ## new shape parameter
+    c1 <- c0 + n/2
+    ## error vector
+    e <- y- X%*%beta
+    ## new scale parameter
+    d1 <- d0 + sum(e^2)/2
+    ## draw new tau
+    sigma2 <- 1/rgamma(1, c1, d1)
+    
+    ## store Gibbs output after burnin
+    if (g > burnin){
+      mcmc.store[g-burnin, ] <- c(beta, sigma2)
+    }
+  }
+  return(mcmc.store)
+}
+
+## 깁스 추출
+set.seed(1973)
+X <- cbind(1, rnorm(100), rnorm(100))
+true.beta <- c(1, -1, 2); true.sigma2 <- 1
+y <- X%*%true.beta + rnorm(100, 0, true.sigma2)
+
+## prior setting
+b0 <- rep(0, 3); B0 <- diag(10, 3)
+sigma.mu <- var(y)[1]; sigma.var <- sigma.mu^2
+c0 <- 4 + 2 * (sigma.mu^2/sigma.var)
+d0 <- 2*sigma.mu*(c0/2 -1)
+
+library(tictoc)
+tic('mycode')
+gibbs.lm.post <- lm.gibbs(y=y, X=X, b0=b0, B0=B0,
+                          c0=c0, d0=d0, mcmc=10000)
+toc()
+
+require(MCMCpack)
+tic("MCMCpack")
+mp.gibbs <- MCMCregress(y~X-1, b0=b0, B0=diag(1/10, 3), c0=c0, d0=d0)
+toc()
+
+
+par(mar=c(3, 3, 2, 1), mgp=c(2, .7, 0), tck=.02)
+out <- as.mcmc(gibbs.lm.post)
+summary(out)
+
+plot(out)
+
+par(mfrow=c(2, 2))
+col.brown <- NetworkChange:::addTrans("brown", 80)
+gibbs.density.plot(gibbs.lm.post[, 1:2], xlab=bquote(beta[1]),
+                   ylab=bquote(beta[2]))
+gibbs.density.plot(gibbs.lm.post[, 2:3], xlab=bquote(beta[2]),
+                   ylab=bquote(beta[3]))
+gibbs.density.plot(gibbs.lm.post[, 3:4], xlab=bquote(beta[3]),
+                   ylab=bquote(sigma^2))
+gibbs.density.plot(gibbs.lm.post[, c(2, 4)], xlab=bquote(beta[2]),
+                   ylab=bquote(sigma^2))
+
+lm.mle.out <- glm(y~X-1, family=gaussian)
+
+"ProbitGibbs" <- function(y, X, b0, B0, mcmc=5000, burnin=1000, verbose=0){
+  N <- length(y)
+  k <- ncol(X)
+  tot.iter <- mcmc+burnin
+  B0inv <- solve(B0)
+  XX <- t(X)%*%X
+  ## 추출된 샘플 저장할 객체
+  beta.store <- matrix(NA, mcmc, k)
+  Z <- matrix(rnorm(N), N, 1)
+  ## MCMC 샘플링
+  for (iter in 1:tot.iter){
+    ##### STEP 1: beta|Z ~ N(b.hat, B.hat)
+    
+    XZ <- t(X)%*%Z
+    post.beta.var <- solve(B0inv + XX)
+    post.beta.mean <- post.beta.var%*%(B0inv%*%b0 + XZ)
+    beta <- post.beta.mean + chol(post.beta.var) %*% rnorm(k)
+    
+    ##### STEP 2: Z|beta ~ TN(X%*%beta, 1)
+    mu <- X%*%beta
+    prob <- pnorm(-mu)
+    for(j in 1:N){
+      uj <- runif(1)
+      z <- ifelse(y[j]==0, mu[j] + qnorm(uj*prob[j]),
+                  mu[j] + qnorm(prob[j] + uj*(1-prob[j])))
+      
+      ## infinity가 샘플되면 극단적 수를 대입
+      if (z==-Inf){
+        Z[j, 1] <- -300
+      } else if (z==Inf){
+        Z[j, 1] <- 300
+      } else {
+        Z[j, 1] <- z
+      }
+    }
+    ## 저장
+    if (iter > burnin){
+      beta.store[iter-burnin, ] <- beta
+    }
+    ## 리포트
+    if(verbose>0&iter%%verbose==0){
+      cat("----------------------------------------",'\n')
+      cat("iteration = ", iter, '\n')
+      cat("beta = ", beta, "\n")
+    }
+  }
+  return(beta.store)
+}
+
+# 프로핏 추정
+set.seed(1973)
+N <- 100
+x1 <- rnorm(N)
+X <- cbind(1, x1)
+k <- ncol(X)
+true.beta <- c(0, .5)
+
+## 종속변수 생성
+Z <- X%*%true.beta + rnorm(N)
+y <- ifelse(Z>0, 1, 0)
+## 사전 확률분포
+b0 <- rep(0, k)
+B0 <- diag(100, k)
+
+## MCMC
+probit.bayes.out <- ProbitGibbs(y, X, b0, B0)
+require(coda)
+probit.bayes.out <- mcmc(probit.bayes.out)
+
+par(mar=c(3, 3, 2, 1), mgp=c(2,.7, 0), tck=.02)
+plot(probit.bayes.out)
+
+gibbs.density.plot(probit.bayes.out[, 1:2], xlab=bquote(beta[1]),
+                   ylab=bquote(beta[2]))
+
+# 6절 EM 알고리즘
