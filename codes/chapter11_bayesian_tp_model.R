@@ -188,3 +188,32 @@ N <- 200
 x1 <- rnorm(N, 1, .5)
 
 ## 전환점 1개를 100에 설정하고
+## 레짐별 모수(1, 1), (1, -0.2)로 프로빗 은닉 변수 z 생성
+z1 <- 1 + x1[1:100] + rnorm(100);
+z2 <- 1 - 0.2*x1[101:200] + rnorm(100);
+z <- c(z1, z2);
+y <- z
+
+## 이분종속변수 생성
+y[z < 1 ] <- 1
+y[z >= 1 & z < 2] <- 2
+y[z >= 2] <- 3
+
+formula <- y~x1
+out1 <- MCMCoprobitChange(formula, m=1,
+                          mcmc=100, burnin=100, thin=1, tune=c(.5, .5), 
+                          b0=0, B0=0.1, marginal.likelihood = "Chib95")
+out2 <- MCMCoprobitChange(formula, m=2,
+                          mcmc=100, burnin=100, thin=1, tune=c(.5, .5, .5), 
+                          b0=0, B0=0.1, marginal.likelihood = "Chib95")
+
+BayesFactor(out1, out2)[3]
+
+par(mfrow=c(1,2), mai=c(0.4, 0.6, 0.3, 0.05))
+plotState(out1, main="전환점 1개", legend.control=c(1, 0.6))
+plotState(out2, main="전환점 2개", legend.control=c(1, 0.6))
+
+par(mfrow=c(1, 2), mai=c(0.4, 0.6, 0.3, 0.05))
+plotChangepoint(out1, verbose = TRUE, ylab="확률밀도")
+
+# 4절 푸아송 회귀분석 전환점 모형
