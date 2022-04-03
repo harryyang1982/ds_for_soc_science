@@ -132,3 +132,59 @@ cat("Regime 2 partial pooling RMSE: ", RMSE(partial.pool, true=true.beta2[2]), "
 
 par(mfrow=c(1, 2), mai=c(0.4, 0.6, 0.3, 0.05), cex.main=0.8)
 plot(sim1, density=FALSE)
+
+
+# 2절 프로빗 회귀분석 전환점 모형
+
+library(MCMCpack)
+set.seed(1973)
+x1 <- rnorm(300, 0, 1)
+true.beta <- c(-5, .2, 1)
+true.alpha <- c(.1, -1., .2)
+X <- cbind(1, x1)
+X
+
+## 두 개의 전환점 생성: 100 and 200
+true.phi1 <- pnorm(true.alpha[1] + x1[1:100]*true.beta[1])
+true.phi2 <- pnorm(true.alpha[2] + x1[101:200]*true.beta[2])
+true.phi3 <- pnorm(true.alpha[3] + x1[201:300]*true.beta[3])
+
+## 종속변수 생성
+y1 <- rbinom(100, 1, true.phi1)
+y2 <- rbinom(100, 1, true.phi2)
+y3 <- rbinom(100, 1, true.phi3)
+Y <- as.ts(c(y1, y2, y3))
+Y
+
+## 서로 다른 전환점 수를 가진 여러 개의 모형을 추정
+out0 <- MCMCprobitChange(formula=Y~X-1, data=parent.frame(), m=0,
+                         mcmc=1000, burnin=1000, b0 = 0, B0 = 0.1,   
+                         marginal.likelihood = c("Chib95"))
+out1 <- MCMCprobitChange(formula=Y~X-1, data=parent.frame(), m=1,
+                         mcmc=1000, burnin=1000, b0 = 0, B0 = 0.1,   
+                         marginal.likelihood = c("Chib95"))
+out2 <- MCMCprobitChange(formula=Y~X-1, data=parent.frame(), m=2,
+                         mcmc=1000, burnin=1000, b0 = 0, B0 = 0.1,   
+                         marginal.likelihood = c("Chib95"))
+out3 <- MCMCprobitChange(formula=Y~X-1, data=parent.frame(), m=3,
+                         mcmc=1000, burnin=1000, b0 = 0, B0 = 0.1,   
+                         marginal.likelihood = c("Chib95"))
+
+## 모형 설명력 비교
+BayesFactor(out0, out1, out2, out3)[3]
+
+
+par(mfrow=c(1, 3), mai=c(0.4, 0.6, 0.3, 0.05))
+plotState(out1, main="전환점 1개")
+plotState(out2, main="전환점 2개")
+plotState(out3, main="전환점 3개")
+
+plotChangepoint(out2, verbose = TRUE, ylab="Density")
+
+# 3절 서수형 프로빗 회귀분석 전환점 모형
+
+set.seed(1909)
+N <- 200
+x1 <- rnorm(N, 1, .5)
+
+## 전환점 1개를 100에 설정하고
