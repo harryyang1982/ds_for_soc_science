@@ -121,3 +121,61 @@ plot.powerlaw(degree.freq3, main="G(10000, 0.5)")
 plot.powerlaw(degree.freq4, main="G(100000, 0.5)")
 
 # 2절 네트워크 시각화
+
+require(NetworkChange)
+data(PostwarAlly)
+Y <- PostwarAlly
+year <- dimnames(Y)[[3]]
+g <- Y[,, year == "1980"]
+
+plot.sociomatrix.jhp <- 
+  function(x, labels = NULL, srt=45, pos=2, lab.col="brown",
+           drawlab = TRUE, diaglab = TRUE, drawlines = TRUE, 
+           xlab = NULL, ylab = NULL, cex.lab = 1, ...) {
+    if ((!(class(x) %in% c("matrix", "array", "data.frame"))) || 
+        (length(dim(x)) > 2)) 
+      x <- as.sociomatrix.sna(x)
+    if (is.list(x)) 
+      x <- x[[1]]
+    n <- dim(x)[1]
+    o <- dim(x)[2]
+    if (is.null(labels)) 
+      labels <- list(NULL, NULL)
+    if (is.null(labels[[1]])) {
+      if (is.null(rownames(x))) 
+        labels[[1]] <- 1:dim(x)[1]
+      else labels[[1]] <- rownames(x)
+    }
+    if (is.null(labels[[2]])) {
+      if (is.null(colnames(x))) 
+        labels[[2]] <- 1:dim(x)[2]
+      else labels[[2]] <- colnames(x)
+    }
+    d <- 1 - (x - min(x, na.rm = TRUE))/(max(x, na.rm = TRUE) - 
+                                           min(x, na.rm = TRUE))
+    if (is.null(xlab)) 
+      xlab <- ""
+    if (is.null(ylab)) 
+      ylab <- ""
+    plot(1, 1, xlim = c(0, o + 1), ylim = c(n + 1, 0), type = "n", 
+         axes = FALSE, xlab = xlab, ylab = ylab, ...)
+    for (i in 1:n) for (j in 1:o) rect(j - 0.5, i + 0.5, j + 
+                                         0.5, i - 0.5, col = gray(d[i, j]), xpd = TRUE, border = drawlines)
+    rect(0.5, 0.5, o + 0.5, n + 0.5, col = NA, xpd = TRUE)
+    if (drawlab) {
+      ## y axis
+      text(rep(0, n), 1:n, labels[[1]], cex = cex.lab, 
+           col=lab.col, srt = srt, pos = pos)
+      ## x axis
+      text(1:o, rep(0, o), labels[[2]], cex = cex.lab, 
+           col=lab.col, srt = srt, pos = pos)
+    }
+    if ((n == o) & (drawlab) & (diaglab)) 
+      if (all(labels[[1]] == labels[[2]])) 
+        text(1:o, 1:n, labels[[1]], cex = cex.lab, 
+             col=lab.col, srt = srt, pos = pos)
+  }
+
+
+## ----post.socio, fig.cap="1980-1년 동맹 네트워크의 사회행렬", echo=TRUE, message=FALSE, fig.align="center", fig.asp = 1----
+plot.sociomatrix.jhp(g, diaglab=FALSE, cex.lab=0.6, pos=3, lab.col="gray40")
