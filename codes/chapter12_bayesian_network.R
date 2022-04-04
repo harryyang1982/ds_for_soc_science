@@ -304,5 +304,76 @@ visualize_heatmap(calc_cent, scale = TRUE)
 
 
 # 4절 네트워크 전환점
+# 4.1 고유벡터 분해
+# 4.3 HNC 추정
 
+set.seed(11173)
+n <- 10
+Ysplit <- MakeBlockNetworkChange(n=n, break.point=.5,
+                                 base.prob=.05, block.prob=.7,
+                                 T=20, type = "split")
+plotnetarray(Ysplit)
 
+set.seed(11173)
+Ymerge <- MakeBlockNetworkChange(n=n, break.point=.5,
+                                 base.prob=.05, block.prob=.7,
+                                 T=20, type="merge")
+plotnetarray(Ymerge)
+
+G <- 1000
+Yout <- NetworkChange(Ysplit, R=2, m=1, mcmc=G, burnin=G, verbose=0)
+
+par(cex.main=0.5)
+Ydraw <- drawPostAnalysis(Yout, Ysplit, n.cluster=c(2, 3))
+multiplot(plotlist=Ydraw, cols=2)
+
+plotV(Yout, cex=1)
+
+# 4.4 전환점의 수 추정
+set.seed(1223)
+G <- 100
+detect <- BreakDiagnostic(Ysplit, R=2, mcmc=G, burnin=G, verbose=0,
+                          break.upper=3)
+save(detect, file = "datasets/break_network_detect.RData")
+load("datasets/break_network_detect.RData")
+
+detect[[1]]
+
+print(detect[[2]])
+
+# 5절 강대국 동맹 네트워크에 대한 응용
+data("MajorAlly")
+time <- dim(MajorAlly)[3]
+
+dim(MajorAlly)
+
+G <- 100
+set.seed(1990)
+test.run <- NetworkStatic(MajorAlly, R=2, mcmc=G, burnin=G, verbose=0, v0=10, v1=time*2)
+V <- attr(test.run, "V")
+sigma.mu <- abs(mean(apply(V, 2, mean)))
+sigma.var <- 10*mean(apply(V, 2, var))
+v0 <- 4 + 2 * (sigma.mu^2/sigma.var)
+v1 <- 2 * sigma.mu * (v0/2 - 1)
+set.seed(11223);
+detect2 <- BreakDiagnostic(MajorAlly, R=2, break.upper=2,
+                           mcmc=G, burnin=G, verbose=0, v0=v0, v1=v1)
+
+detect2[[1]]
+
+G <- 100
+K <- dim(MajorAlly)
+m <- 2
+initial.s <- sort(rep(1:(m+1), length=K[[3]]))
+set.seed(11223);
+fit <- NetworkChange(MajorAlly, R=2, m=m, mcmc=G, initial.s = initial.s,
+                     burnin=G, verbose=0, v0=v0, v1=v1)
+attr(fit, "y") <- 1:K[[3]]
+
+par(mai=c(0.4, 0.6, 0.3, 0.05), tck=.02)
+plotState(fit, main="")
+
+p.list <- drawPostAnalysis(fit, MajorAlly, n.cluster=c(3, 3, 3))
+multiplot(plotlist = p.list, cols=3)
+
+drawRegimeRaw(fit, MajorAlly)
