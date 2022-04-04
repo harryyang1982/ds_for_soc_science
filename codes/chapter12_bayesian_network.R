@@ -179,3 +179,130 @@ plot.sociomatrix.jhp <-
 
 ## ----post.socio, fig.cap="1980-1년 동맹 네트워크의 사회행렬", echo=TRUE, message=FALSE, fig.align="center", fig.asp = 1----
 plot.sociomatrix.jhp(g, diaglab=FALSE, cex.lab=0.6, pos=3, lab.col="gray40")
+
+
+## 블록 모형
+
+plot.blockmodel.jhp <- 
+  function(x, srt=45, pos=2, lab.col="brown",
+           cex.lab=cex.lab, drawlab=TRUE, diaglab=TRUE, ...) {
+    oldpar <- par(no.readonly = TRUE)
+    on.exit(par(oldpar))
+    n <- dim(x$blocked.data)[2]
+    m <- stackcount(x$blocked.data)
+    if (!is.null(x$plabels))
+      plab <- x$plabels
+    else plab <- (1:n)[x$order.vector]
+    if (!is.null(x$glabels))
+      lab <- x$labels
+    else glab <- 1:m
+    par(mfrow = c(floor(sqrt(m)), ceiling(m/floor(sqrt(m)))))
+    if (m > 1)
+      for(i in 1:m) {
+        plot.sociomatrix.jhp(x$blocked.data[i, , ],
+                             labels=list(plab, plab),
+                             main = "",
+                             srt=srt, pos=pos, lab.col=lab.col,
+                             cex.lab = cex.lab,
+                             drawlab = drawlab, diaglab = diaglab,
+                             cex.main=0.5, drawlines = FALSE)
+        for (j in 2:n) {
+          if (x$block.membership[j] != x$block.membership[j - 1])
+            abline(v = j - 0.5, h = j - 0.5, lty=3)
+        }
+      }
+    else {
+      plot.sociomatrix.jhp(x$blocked.data,
+                           labels=list(plab, plab),
+                           main="",
+                           srt=srt, pos=pos, lab.col=lab.col,
+                           cex.lab = cex.lab,
+                           drawlab=drawlab, diaglab=diaglab,
+                           cex.main=0.5, drawlines = FALSE)
+      for (j in 2:n) {
+        if (x$block.membership[j] != x$block.membership[j - 1])
+          abline(v = j - 0.5, h = j - 0.5, lty = 3)
+      }
+    }
+  }
+
+library(sna)
+eq <- sna::equiv.clust(g)
+b <- sna::blockmodel(g, eq, h=10)
+plot.blockmodel.jhp(b, main="",
+                    diaglab=FALSE, cex.lab=0.6, pos=3, lab.col="gray40")
+
+n <- network(g, directed = FALSE)
+n %v% "family" <- as.character(b$block.membership)
+n %v% "importance" <- sna::degree(n)
+
+library(ggnetwork)
+library(RColorBrewer)
+
+set.seed(1973)
+mycolors = c(brewer.pal(name="Dark2", n= 8),
+             brewer.pal(name="Paired", n = 6))
+g.1 <- ggplot(ggnetwork(n), aes(x = x, y = y, xend = xend, yend = yend)) +
+  geom_edges(color="grey50", alpha=0.5) +
+  geom_nodes(aes(x, y, color = family, size= 5.5 * importance),
+             alpha=0.5,
+             show.legend=FALSE) +
+  geom_nodes(aes(x, y, color=family, size=1.5*importance),
+             show.legend=FALSE) +
+  guides(size = "none") +
+  geom_nodelabel_repel(aes(label = vertex.names, color = family,
+                           fill = factor(family)), alpha = 0.5,
+                       box.padding=0.35, point.padding=0.5, fontface="bold",
+                       family="AppleGothic", color="black", size = 4, show.legend = FALSE) +
+  scale_color_manual(values = mycolors) +
+  theme_blank()
+
+g.1
+
+g1950 <- graph_from_adjacency_matrix(Y[,,year=="1950"])
+g1970 <- graph_from_adjacency_matrix(Y[,,year=="1970"])
+g1990 <- graph_from_adjacency_matrix(Y[,,year=="1990"])
+g2010 <- graph_from_adjacency_matrix(Y[,,year=="2010"])
+
+degree.freq1 <- degreeGraph(g1950)
+degree.freq2 <- degreeGraph(g1970)
+degree.freq3 <- degreeGraph(g1990)
+degree.freq4 <- degreeGraph(g2010)
+pdf("figures/allianceNetworkdegree.pdf", width=10, height=10)   
+par(mfrow=c(2, 2), mai=c(1, 1, 1, 0.05), cex.main=0.8, cex.axis=0.8)
+plot.powerlaw(degree.freq1, xlab="연결도", main="1950년 동맹 네트워크", cex.main=0.8)
+plot.powerlaw(degree.freq2, xlab="연결도", main="1970년 동맹 네트워크", cex.main=0.8)
+plot.powerlaw(degree.freq3, xlab="연결도", main="1990년 동맹 네트워크", cex.main=0.8)
+plot.powerlaw(degree.freq4, xlab="연결도", main="2010년 동맹 네트워크", cex.main=0.8)
+dev.off()
+
+
+# 3절 네트워크 중심성 분석
+
+library(CINNA)
+g.graph <- graph.adjacency(Y[,, which(year==1980)], mode="undirected")
+## proper_centralities(g.graph)
+
+head(igraph::degree(g.graph))
+
+country.names <- dimnames(Y)[[1]]
+## find a connected component of the graph
+g.comp <- igraph::components(g.graph)
+g.member <- lapply(seq_along(g.comp$csize)[g.comp$csize > 1],
+                   function(x) V(g.graph)$name[g.comp$membership %in% x])
+## the first group is chosen
+locator.member <- is.element(country.names, g.member[[1]])
+g.connected <- graph.adjacency(Y[locator.member, locator.member, which(year==1980)], mode="undirected")
+pr_cent <- proper_centralities(g.connected)
+calc_cent <- 
+  calculate_centralities(g.connected, 
+                         include  = pr_cent[c(1, 3, 5, 7, 9, 10, 15, 
+                                              18, 19, 21, 26, 28, 29)])
+
+par(cex = 0.7)
+visualize_heatmap(calc_cent, scale = TRUE)
+
+
+# 4절 네트워크 전환점
+
+
